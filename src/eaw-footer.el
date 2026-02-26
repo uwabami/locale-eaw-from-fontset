@@ -1,6 +1,6 @@
 
 ;;;###autoload
-(defun eaw-custominit ()
+(defun eaw-init ()
   (while (char-table-parent char-width-table)
     (setq char-width-table (char-table-parent char-width-table)))
   (let ((table (make-char-table nil)))

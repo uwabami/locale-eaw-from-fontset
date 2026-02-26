@@ -1,6 +1,7 @@
 ;;; eaw.el --- Fix east asian ambiguous width issue for emacs -*- lexical-binding: t; -*-
 ;; Author: Youhei SASAKI <uwabami@gfd-dennou.org>
 ;; URL: https://github.com/uwabami/locale-from-fontset
+;; Package-Requires: ((emacs "23"))
 ;; Version: 12
 ;; MIT License
 (setq code-half '(
@@ -98,7 +99,7 @@
 ))
 
 ;;;###autoload
-(defun eaw-custominit ()
+(defun eaw-init ()
   (while (char-table-parent char-width-table)
     (setq char-width-table (char-table-parent char-width-table)))
   (let ((table (make-char-table nil)))
