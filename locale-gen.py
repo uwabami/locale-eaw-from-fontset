@@ -177,25 +177,16 @@ class FontWidthScanner:
                 font = TTFont(path)
                 cmap = font.getBestCmap()
 
-                if 'hmtx' not in font:
-                    print(f"Warning: {path} has no hmtx table. Skipping.", file=sys.stderr)
+                # head テーブルから UPM (解像度) を取得
+                if 'hmtx' not in font or 'head' not in font:
+                    print(f"Warning: {path} lacks required tables. Skipping.", file=sys.stderr)
                     continue
-
-                hmtx = font['hmtx']
-
-                # そのフォント自身の基準幅（'H' または先頭のグリフの幅）を計算
-                if 0x0048 in cmap:
-                    base_width = hmtx[cmap[0x0048]][0]
-                elif 0x0020 in cmap:
-                    base_width = hmtx[cmap[0x0020]][0]
-                else:
-                    base_width = next(iter(hmtx.metrics.values()))[0]
 
                 self.fonts.append({
                     'path': path,
                     'cmap': cmap,
-                    'hmtx': hmtx,
-                    'base_width': base_width
+                    'hmtx': font['hmtx'],
+                    'upm': font['head'].unitsPerEm
                 })
             except Exception as e:
                 print(f"Warning: Failed to load font {path}: {e}", file=sys.stderr)
@@ -214,14 +205,14 @@ class FontWidthScanner:
                 glyph_name = font_info['cmap'][code]
                 advance = font_info['hmtx'][glyph_name][0]
 
-                # フォント自身の基準幅
-                base_width = font_info['base_width']
+                # UPMで割って、文字幅の「比率」を算出
+                ratio = advance / font_info['upm']
 
                 # 基準フォントの1セル幅（比率）と比較する
-                if advance <= base_width * 1.2:
-                    return 1
-                else:
+                if ratio >= 0.8:
                     return 2
+                else:
+                    return 1
 
         return None
 
@@ -308,7 +299,7 @@ def load_emoji(fn):
             if not match:
                 continue
             (code_or_range, prop, comment) = match.groups()
-            if prop != 'Emoji_Presentation':
+            if prop != 'Emoji':
                 continue
             if '.' in code_or_range:
                  (start, end) = tuple(code_or_range.split('..'))
@@ -343,9 +334,7 @@ def build_comprehensive_width_map(ucd, scanner, emoji_dict, args):
     rescue_codes.update(ucd.group['miscellaneous_symbols'])  # ♠, ♦, ☃, ♨
     # rescue_codes.update(ucd.group['progress_bar'])           # 🮀, 🮆 (プログレスバー等)
 
-    target_codes = (pure_amb | rescue_codes) \
-    - set(emoji_dict.keys()) \
-    - set(ucd.group['nerdfont'])
+    target_codes = (pure_amb | rescue_codes) - set(emoji_dict.keys()) - set(ucd.group['nerdfont'])
 
     for code in sorted(target_codes):
         # まずはフォント群から実測値を取得
@@ -363,17 +352,19 @@ def build_comprehensive_width_map(ucd, scanner, emoji_dict, args):
 
         width_map[code] = final_width
 
-        for code in emoji_dict.keys():
-            width_map[code] = args.fallback_emoji
+    for code in emoji_dict.keys():
+        if code <= 0x00FF:
+            continue
+        width_map[code] = args.fallback_emoji
 
-        for code in ucd.group['private']:
-            width_map[code] = args.fallback_pua
+    for code in ucd.group['private']:
+        width_map[code] = args.fallback_pua
 
-            # Nerd Fonts 領域 (Private 以外にはみ出している分を補完)
-        for code in ucd.group['nerdfont']:
-            width_map[code] = args.fallback_pua
+        # Nerd Fonts 領域 (Private 以外にはみ出している分を補完)
+    for code in ucd.group['nerdfont']:
+        width_map[code] = args.fallback_pua
 
-        return width_map, target_codes
+    return width_map, target_codes
 
 def print_locale(out, start, end):
     if end <= 0xffff:
