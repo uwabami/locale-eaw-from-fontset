@@ -336,7 +336,8 @@ def build_comprehensive_width_map(ucd, scanner, emoji_dict, args):
     rescue_codes.update(ucd.group['miscellaneous_symbols'])  # ♠, ♦, ☃, ♨
     # rescue_codes.update(ucd.group['progress_bar'])           # 🮀, 🮆 (プログレスバー等)
 
-    target_codes = (pure_amb | rescue_codes) - set(emoji_dict.keys()) - set(ucd.group['nerdfont'])
+    # Nerdfont も判定することに.
+    target_codes = (pure_amb | rescue_codes | set(ucd.group['nerdfont']) - set(emoji_dict.keys()) )
 
     for code in sorted(target_codes):
         # まずはフォント群から実測値を取得
@@ -360,10 +361,6 @@ def build_comprehensive_width_map(ucd, scanner, emoji_dict, args):
         width_map[code] = args.fallback_emoji
 
     for code in ucd.group['private']:
-        width_map[code] = args.fallback_pua
-
-        # Nerd Fonts 領域 (Private 以外にはみ出している分を補完)
-    for code in ucd.group['nerdfont']:
         width_map[code] = args.fallback_pua
 
     return width_map, target_codes
@@ -468,8 +465,6 @@ call setcellwidths([\
 
 if __name__ == '__main__':
     main()
-
-
 
 # def generate_json(config, width_list):
 #     flavor = config.name.lower()
